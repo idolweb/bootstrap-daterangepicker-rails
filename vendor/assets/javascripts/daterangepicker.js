@@ -55,6 +55,8 @@
         this.linkedCalendars = true;
         this.autoUpdateInput = true;
         this.ranges = {};
+        this.rangesInDropdown = false;
+        this.withSelect2 = false;
 
         this.opens = 'right';
         if (this.element.hasClass('pull-right'))
@@ -74,6 +76,7 @@
             applyLabel: 'Apply',
             cancelLabel: 'Cancel',
             weekLabel: 'W',
+            rangeLabel: 'Range',
             customRangeLabel: 'Custom Range',
             daysOfWeek: moment.weekdaysMin(),
             monthNames: moment.monthsShort(),
@@ -160,6 +163,15 @@
 
             if (typeof options.locale.weekLabel === 'string')
               this.locale.weekLabel = options.locale.weekLabel;
+
+            if (typeof options.locale.rangeLabel === 'string')
+              this.locale.rangeLabel = options.locale.rangeLabel;
+
+            if (typeof options.rangesInDropdown === 'boolean')
+              this.rangesInDropdown = options.rangesInDropdown;
+
+            if (typeof options.withSelect2 === 'boolean')
+              this.withSelect2 = options.withSelect2;
 
             if (typeof options.locale.customRangeLabel === 'string')
               this.locale.customRangeLabel = options.locale.customRangeLabel;
@@ -333,14 +345,30 @@
                 this.ranges[range] = [start, end];
             }
 
-            var list = '<ul>';
-            for (range in this.ranges) {
-                list += '<li>' + range + '</li>';
+            var rangeList = null;
+            if (this.rangesInDropdown){
+                rangeList = '<label>' + this.locale.rangeLabel + '</label>';
+                rangeList += '<select>';
+                for (range in this.ranges) {
+                    rangeList += '<option>' + range + '</option>';
+                }
+                rangeList += '<option>' + this.locale.customRangeLabel + '</option>';
+                rangeList += '</select>';
+                this.container.find('.ranges select').remove();
+            } else {
+                rangeList = '<ul>';
+                for (range in this.ranges) {
+                    rangeList += '<li>' + range + '</li>';
+                }
+                rangeList += '<li>' + this.locale.customRangeLabel + '</li>';
+                rangeList += '</ul>';
+                this.container.find('.ranges ul').remove();
             }
-            list += '<li>' + this.locale.customRangeLabel + '</li>';
-            list += '</ul>';
-            this.container.find('.ranges ul').remove();
-            this.container.find('.ranges').prepend(list);
+
+            this.container.find('.ranges').prepend(rangeList);
+            if (this.rangesInDropdown && this.withSelect2){
+                this.container.find('.ranges select').select2({ minimumResultsForSearch: -1});
+            }
         }
 
         if (typeof cb === 'function') {
@@ -410,6 +438,7 @@
             .on('click.daterangepicker', 'button.applyBtn', $.proxy(this.clickApply, this))
             .on('click.daterangepicker', 'button.cancelBtn', $.proxy(this.clickCancel, this))
             .on('click.daterangepicker', 'li', $.proxy(this.clickRange, this))
+            .on('change.daterangepicker', 'select', $.proxy(this.clickRange, this))
             .on('mouseenter.daterangepicker', 'li', $.proxy(this.hoverRange, this))
             .on('mouseleave.daterangepicker', 'li', $.proxy(this.updateFormInputs, this));
 
@@ -586,24 +615,50 @@
                 if (this.timePicker) {
                     if (this.startDate.isSame(this.ranges[range][0]) && this.endDate.isSame(this.ranges[range][1])) {
                         customRange = false;
-                        this.chosenLabel = this.container.find('.ranges li:eq(' + i + ')').addClass('active').html();
+                        if (this.rangesInDropdown){
+                            this.chosenLabel = this.container.find('.ranges option:eq(' + i + ')').html();
+                            if (this.withSelect2){
+                                this.container.find('.ranges select').select2('val', this.chosenLabel);
+                            } else {
+                                this.container.find('.ranges select').val(this.chosenLabel);
+                            }
+                        } else {
+                            this.chosenLabel = this.container.find('.ranges li:eq(' + i + ')').addClass('active').html();
+                        }
                         break;
                     }
                 } else {
                     //ignore times when comparing dates if time picker is not enabled
                     if (this.startDate.format('YYYY-MM-DD') == this.ranges[range][0].format('YYYY-MM-DD') && this.endDate.format('YYYY-MM-DD') == this.ranges[range][1].format('YYYY-MM-DD')) {
                         customRange = false;
-                        this.chosenLabel = this.container.find('.ranges li:eq(' + i + ')').addClass('active').html();
+                        if (this.rangesInDropdown){
+                            this.chosenLabel = this.container.find('.ranges option:eq(' + i + ')').html();
+                            if (this.withSelect2){
+                                this.container.find('.ranges select').select2('val', this.chosenLabel);
+                            } else {
+                                this.container.find('.ranges select').val(this.chosenLabel);
+                            }
+                        } else {
+                            this.chosenLabel = this.container.find('.ranges li:eq(' + i + ')').addClass('active').html();
+                        }
                         break;
                     }
                 }
                 i++;
             }
             if (customRange) {
-                this.chosenLabel = this.container.find('.ranges li:last').addClass('active').html();
+                if (this.rangesInDropdown) {
+                    this.chosenLabel = this.container.find('.ranges option:last').html();
+                    if (this.withSelect2){
+                        this.container.find('.ranges select').select2('val', this.chosenLabel);
+                    } else {
+                        this.container.find('.ranges select').val(this.chosenLabel);
+                    }
+                } else {
+                    this.chosenLabel = this.container.find('.ranges li:last').addClass('active').html();
+                }
                 this.showCalendars();
             }
-
         },
 
         renderCalendar: function(side) {
@@ -827,6 +882,9 @@
 
             this.container.find('.calendar.' + side + ' .calendar-table').html(html);
 
+            if (this.showDropdowns && this.withSelect2) {
+                this.container.find('.calendar.' + side + ' .calendar-table select').select2({ minimumResultsForSearch: -1});
+            }
         },
 
         renderTimePicker: function(side) {
@@ -1129,7 +1187,7 @@
         },
 
         clickRange: function(e) {
-            var label = e.target.innerHTML;
+            var label = e.val || e.target.innerHTML;
             this.chosenLabel = label;
             if (label == this.locale.customRangeLabel) {
                 this.showCalendars();
